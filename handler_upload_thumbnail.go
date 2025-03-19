@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"net/http"
+    "bytes"
     "io"
-    "encoding/base64"
+    "strings"
+    "os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -57,9 +59,23 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
         return
     }
 
-    thumbData := base64.StdEncoding.EncodeToString(data);
-    thumbUrl := fmt.Sprintf("data:%s,base64,%s", mediaType, thumbData)
-    video.ThumbnailURL = &thumbUrl
+    extension := strings.Split(mediaType, "/")[1]
+    diskFileUrl := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, videoIDString, extension)
+    diskFile, err := os.Create(diskFileUrl)
+    fmt.Printf("creating file for thumb: %s\n", diskFileUrl)
+    if err != nil {
+        fmt.Printf("failed to create file for thumb: %s\n", err.Error())
+        respondWithJSON(w, http.StatusInternalServerError, struct{}{})
+        return
+    }
+    _, err = io.Copy(diskFile, bytes.NewBuffer(data))
+    if err != nil {
+        fmt.Printf("failed to copy to file: %s\n", err.Error())
+        respondWithJSON(w, http.StatusInternalServerError, struct{}{})
+        return
+    }
+
+    video.ThumbnailURL = &diskFileUrl
     err = cfg.db.UpdateVideo(video)
     if err != nil {
         respondWithJSON(w, http.StatusInternalServerError, struct{}{})
