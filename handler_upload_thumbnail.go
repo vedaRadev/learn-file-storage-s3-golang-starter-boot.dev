@@ -6,6 +6,7 @@ import (
     "bytes"
     "io"
     "strings"
+    "mime"
     "os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -52,7 +53,11 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
         return
     }
 
-    mediaType := fileHeader.Header.Get("Content-Type")
+    mediaType, _, err := mime.ParseMediaType(fileHeader.Header.Get("Content-Type"))
+    if mediaType != "image/jpeg" && mediaType != "image/png" {
+        respondWithError(w, http.StatusBadRequest, "invalid thumbnail format", nil)
+        return
+    }
     data, err := io.ReadAll(file)
     if err != nil {
         respondWithJSON(w, http.StatusInternalServerError, struct{}{})
