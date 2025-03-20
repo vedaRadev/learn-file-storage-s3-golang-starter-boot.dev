@@ -102,8 +102,8 @@ func main() {
 	appHandler := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
 	mux.Handle("/app/", appHandler)
 
-	assetsHandler := http.StripPrefix("/app/assets", http.FileServer(http.Dir(assetsRoot)))
-	mux.Handle("/app/assets/", cacheMiddleware(assetsHandler))
+	assetsHandler := http.StripPrefix("/assets", http.FileServer(http.Dir(assetsRoot)))
+	mux.Handle("/assets/", cacheMiddleware(assetsHandler))
 
 	mux.HandleFunc("POST /api/login", cfg.handlerLogin)
 	mux.HandleFunc("POST /api/refresh", cfg.handlerRefresh)

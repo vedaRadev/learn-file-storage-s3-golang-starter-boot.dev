@@ -65,22 +65,24 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
     }
 
     extension := strings.Split(mediaType, "/")[1]
-    diskFileUrl := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, videoIDString, extension)
-    diskFile, err := os.Create(diskFileUrl)
-    fmt.Printf("creating file for thumb: %s\n", diskFileUrl)
+    assetPath := fmt.Sprintf("%s.%s", videoIDString, extension)
+    assetDiskPath := fmt.Sprintf("%s/%s", cfg.assetsRoot, assetPath)
+    assetFile, err := os.Create(assetDiskPath)
+    fmt.Printf("creating file for thumb: %s\n", assetDiskPath)
     if err != nil {
         fmt.Printf("failed to create file for thumb: %s\n", err.Error())
         respondWithJSON(w, http.StatusInternalServerError, struct{}{})
         return
     }
-    _, err = io.Copy(diskFile, bytes.NewBuffer(data))
+    _, err = io.Copy(assetFile, bytes.NewBuffer(data))
     if err != nil {
         fmt.Printf("failed to copy to file: %s\n", err.Error())
         respondWithJSON(w, http.StatusInternalServerError, struct{}{})
         return
     }
 
-    video.ThumbnailURL = &diskFileUrl
+    assetURL := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetPath)
+    video.ThumbnailURL = &assetURL
     err = cfg.db.UpdateVideo(video)
     if err != nil {
         respondWithJSON(w, http.StatusInternalServerError, struct{}{})
