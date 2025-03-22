@@ -8,6 +8,8 @@ import (
     "strings"
     "mime"
     "os"
+    "crypto/rand"
+    "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -65,7 +67,10 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
     }
 
     extension := strings.Split(mediaType, "/")[1]
-    assetPath := fmt.Sprintf("%s.%s", videoIDString, extension)
+    byteSlice := make([]byte, 32, 32)
+    rand.Read(byteSlice)
+    assetName := base64.RawURLEncoding.EncodeToString(byteSlice)
+    assetPath := fmt.Sprintf("%s.%s", assetName, extension)
     assetDiskPath := fmt.Sprintf("%s/%s", cfg.assetsRoot, assetPath)
     assetFile, err := os.Create(assetDiskPath)
     fmt.Printf("creating file for thumb: %s\n", assetDiskPath)
