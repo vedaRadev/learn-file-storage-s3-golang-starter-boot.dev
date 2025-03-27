@@ -47,6 +47,14 @@ func getVideoAspectRatio(filePath string) (string, error) {
     return result, nil
 }
 
+func processVideoForFastStart(filePath string) (string, error) {
+    outputPath := filePath + ".processing"
+    cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", outputPath)
+    err := cmd.Run()
+    if err != nil { return "", err }
+    return outputPath, nil
+}
+
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
     videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
@@ -89,6 +97,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
         respondWithError(w, http.StatusInternalServerError, "failed to create temp file", nil)
         return
     }
+    fmt.Printf("created temp file for video: %s\n", tempFile.Name());
     defer os.Remove(tempFile.Name());
     defer tempFile.Close()
 
@@ -100,14 +109,22 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
     }
     fmt.Printf("copied %d bytes\n", bytesCopied)
 
-    _, err = tempFile.Seek(0, io.SeekStart)
+    fastStartFileName, err := processVideoForFastStart(tempFile.Name())
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "failed seek", nil)
+        fmt.Printf("%s\n", err.Error())
+        respondWithError(w, http.StatusInternalServerError, "failed to process video for fast start", err)
         return
     }
+    fmt.Printf("create fast start video: %s\n", fastStartFileName);
+    fastStartFile, err := os.Open(fastStartFileName)
+    if err != nil {
+        respondWithError(w, http.StatusInternalServerError, "failed to open fast start video file", err)
+        return
+    }
+    defer os.Remove(fastStartFile.Name())
+    defer fastStartFile.Close()
 
-    fmt.Printf("%s\n", tempFile.Name());
-    aspectRatio, err := getVideoAspectRatio(tempFile.Name())
+    aspectRatio, err := getVideoAspectRatio(fastStartFile.Name())
     if err != nil {
         respondWithError(w, http.StatusInternalServerError, "failed to get video aspect ratio", err)
         return
@@ -121,7 +138,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
     input := s3.PutObjectInput {
         Bucket: &cfg.s3Bucket,
         Key: &fileKey,
-        Body: tempFile,
+        Body: fastStartFile,
         ContentType: &mediaType,
     }
     _, err = cfg.s3Client.PutObject(context.Background(), &input)
