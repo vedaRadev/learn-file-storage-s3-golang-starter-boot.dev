@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+    "fmt"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
@@ -94,8 +95,12 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusNotFound, "Couldn't get video", err)
 		return
 	}
+    presignedVideo, err := cfg.dbVideotoSignedVideo(video)
+    if err != nil {
+        fmt.Printf("get: failed to generate presigned video url: %s\n", err.Error())
+    }
 
-	respondWithJSON(w, http.StatusOK, video)
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }
 
 func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +120,15 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve videos", err)
 		return
 	}
+    for i, video := range videos {
+        if video.VideoURL != nil {
+            presigned, err := cfg.dbVideotoSignedVideo(video)
+            if err != nil {
+                fmt.Printf("retrieve: failed to generate presigned video url: %s\n", err.Error())
+            }
+            videos[i] = presigned
+        }
+    }
 
 	respondWithJSON(w, http.StatusOK, videos)
 }

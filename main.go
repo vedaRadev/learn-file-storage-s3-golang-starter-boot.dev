@@ -4,7 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+    "time"
     "context"
+    "strings"
+    "errors"
+    "fmt"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 
@@ -13,6 +17,18 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
+
+func generatePresignedURL(s3Client *s3.Client, bucket, key string) (string, error) {
+    presignedClient := s3.NewPresignClient(s3Client)
+    params := s3.GetObjectInput { Bucket: &bucket, Key: &key }
+    presignedRequest, err := presignedClient.PresignGetObject(
+        context.Background(),
+        &params,
+        s3.WithPresignExpires(120 * time.Second),
+    )
+    if err != nil { return "", err }
+    return presignedRequest.URL, nil
+}
 
 type apiConfig struct {
 	db               database.Client
@@ -25,6 +41,18 @@ type apiConfig struct {
 	s3CfDistribution string
     s3Client         *s3.Client
 	port             string
+}
+
+func (cfg *apiConfig) dbVideotoSignedVideo(video database.Video) (database.Video, error) {
+    if video.VideoURL == nil { return video, errors.New("video url is nil") }
+    parts := strings.Split(*video.VideoURL, ",")
+    if len(parts) != 2 { return video, fmt.Errorf("invalid video url: %s", *video.VideoURL) }
+    bucket := parts[0]
+    key := parts[1]
+    presignedURL, err := generatePresignedURL(cfg.s3Client, bucket, key)
+    if err != nil { return video, err }
+    video.VideoURL = &presignedURL
+    return video, nil
 }
 
 type thumbnail struct {
